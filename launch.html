@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>啟動中 - 聖瑪智慧排床系統</title>
+    <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.js"></script>
+</head>
+<body>
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; color: #666;">
+        <div class="loader"></div>
+        <p>正在連線至 FHIR 伺服器並驗證權限...</p>
+    </div>
+
+    <style>
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #764ba2;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
+    <script>
+        // 執行 SMART on FHIR 啟動程序 [cite: 19, 20]
+        FHIR.oauth2.authorize({
+            // 臺灣 50 優良 SMART App 徵案 - 第二階段測試用 Client ID [cite: 13]
+            clientId: "cc344727-6f90-496c-94fd-c7829aa9a51d", 
+
+            // 第二階段測試用 Client Secret [cite: 14]
+            clientSecret: "79f04b56b33491716c0880af72cdef7d3f0629111421cedd18353651cd313d9e",
+
+            // 請求的權限範圍：包含啟動上下文、使用者資訊、以及排床所需的病患/就醫/位置資料 [cite: 20, 22]
+            scope: "launch openid fhirUser patient/*.read encounter.read location.read",
+
+            // 授權成功後跳轉回主程式頁面
+            redirectUri: "index.html" 
+        });
+    </script>
+</body>
+</html>

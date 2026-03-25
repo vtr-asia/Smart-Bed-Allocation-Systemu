@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>🛏️ 聖瑪智慧排床系統 v2.0 - 智慧優先權演算法</title>
+  <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+    .header { text-align: center; color: white; margin-bottom: 30px; }
+    .logo { font-size: 2.5em; margin-bottom: 10px; }
+    .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+    .card { border-radius: 16px; padding: 24px; background: white; box-shadow: 0 10px 30px rgba(0,0,0,0.2); backdrop-filter: blur(10px); }
+    .urgency-high { background: linear-gradient(45deg, #ff6b6b, #ff8e8e); color: white; }
+    .urgency-med { background: linear-gradient(45deg, #ffd43b, #ffe66d); color: #856404; }
+    .available { background: linear-gradient(45deg, #51cf66, #74c69d); color: white; }
+    .assigned { background: linear-gradient(45deg, #007bff, #339af0); color: white; }
+    button { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; transition: all 0.3s; }
+    .assign-btn { background: #28a745; color: white; }
+    .assign-btn:hover { background: #218838; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(40,167,69,0.4); }
+    .assign-btn:disabled { background: #6c757d; cursor: not-allowed; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { padding: 12px 8px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f8f9fa; font-weight: 600; }
+    .priority-score { font-size: 24px; font-weight: bold; color: #007bff; }
+    .progress-bar { width: 100%; height: 28px; background: #eee; border-radius: 14px; overflow: hidden; margin: 16px 0; }
+    .progress-fill { height: 100%; transition: width 0.5s; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; }
+    .score-breakdown { font-size: 12px; color: #666; margin-top: 6px; background: #f8f9fa; padding: 8px; border-radius: 6px; }
+    .fhir-status { position: fixed; top: 20px; right: 20px; padding: 12px; background: #28a745; color: white; border-radius: 8px; font-weight: bold; }
+    .controls { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    select, input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; }
+    @media (max-width: 768px) { .dashboard { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">🏥 聖瑪智慧排床系統</div>
+    <h2>智慧優先權演算法 v2.0 | THAS FHIR 相容</h2>
+    <div id="fhirStatus" class="fhir-status" style="display: none;">✅ FHIR連線成功</div>
+  </div>
+
+  <div class="controls">
+    <select id="departmentFilter">
+      <option value="">全院</option>
+      <option value="內科">內科</option>
+      <option value="外科">外科</option>
+      <option value="加護">加護病房</option>
+      <option value="心臟內科">心臟內科</option>
+    </select>
+    <button class="assign-btn" onclick="autoAssignAll()" style="font-size: 16px;">
+      🚀 全部智慧自動配床
+    </button>
+    <button class="assign-btn" onclick="addDemoPatient()" style="background: #17a2b8;">
+      ➕ 新增測試病患
+    </button>
+    <div style="margin-left: auto; font-weight: bold; color: white;">
+      最後更新：<span id="lastUpdate">即時</span>
+    </div>
+  </div>
+
+  <div class="dashboard">
+    <div class="card">
+      <h3>🚨 候床病患 (智慧優先排序)</h3>
+      <div id="urgentQueue">載入中...</div>
+    </div>
+
+    <div class="card">
+      <h3>✅ 聖瑪可用床位</h3>
+      <div id="availableBeds">載入中...</div>
+    </div>
+
+    <div class="card">
+      <h3>📊 全院床位使用率</h3>
+      <div id="occupancyChart">分析中...</div>
+    </div>
+
+    <div class="card">
+      <h3>🎯 智慧最佳配對建議</h3>
+      <div id="smartRecommendation">等待建議...</div>
+    </div>
+  </div>
+
+  <script type="text/javascript">
+    // 聖瑪專屬床位資料（未來接FHIR Location）
+    let mockBeds = {
+      '聖瑪101內': { status: 'available', department: '內科', cleaner: false, feature: '心導管室旁' },
+      '聖瑪102內': { status: 'available', department: '內科', cleaner: false, feature: '普通病房' },
+      '聖瑪103內': { status: 'cleaning', department: '內科', eta: '15分鐘' },
+      '聖瑪201外': { status: 'available', department: '外科', cleaner: false, feature: '手術室旁' },
+      '聖瑪202外': { status: 'occupied', department: '外科', patient: '王小明', los: 2 },
+      '聖瑪301心': { status: 'available', department: '心臟內科', cleaner: false, feature: 'CCU備用' },
+      '聖瑪401加': { status: 'available', department: '加護', cleaner: false, feature: '呼吸器設備' }
+    };
+
+    let mockPatients = [
+      { id: '聖瑪001', name: '李大衛', urgency: '高', department: '內科', 
+        aclsLevel: 3, expectedLOS: 2, fromER: true, transfer: false, priority: null },
+      { id: '聖瑪002', name: '陳美玲', urgency: '中', department: '外科', 
+        aclsLevel: 2, expectedLOS: 5, fromER: true, transfer: false, priority: null },
+      { id: '聖瑪003', name: '聖瑪VIP', urgency: '高', department: '心臟內科', 
+        aclsLevel: 3, expectedLOS: 3, fromER: true, transfer: true, vip: true, priority: null }
+    ];
+
+    // 🔥 核心智慧優先權演算法
+    function calculatePriority(patient, availableBeds) {
+      const weights = { urgency: 0.40, acuity: 0.25, deptMatch: 0.20, los: 0.10, transfer: 0.05, vip: 0.05 };
+      
+      const urgencyScore = patient.fromER ? 100 : (patient.transfer ? 70 : 30);
+      const acuityScore = patient.aclsLevel === 3 ? 100 : patient.aclsLevel === 2 ? 70 : 30;
+      
+      let bestDeptMatch = 0, bestBedId = null;
+      for (const [bedId, bed] of Object.entries(availableBeds)) {
+        if (bed.status !== 'available') continue;
+        let matchScore = bed.department === patient.department ? 100 : 
+                        isAdjacentDept(bed.department, patient.department) ? 70 : 30;
+        if (matchScore > bestDeptMatch) {
+          bestDeptMatch = matchScore;
+          bestBedId = bedId;
+        }
+      }
+      
+      const losScore = patient.expectedLOS < 3 ? 100 : patient.expectedLOS <= 7 ? 50 : 20;
+      const transferScore = patient.transfer ? 100 : 0;
+      const vipScore = patient.vip ? 100 : 0;
+      
+      const priorityScore = 
+        weights.urgency * urgencyScore +
+        weights.acuity * acuityScore +
+        weights.deptMatch * bestDeptMatch +
+        weights.los * losScore +
+        weights.transfer * transferScore +
+        weights.vip * vipScore;
+      
+      return {
+        score: Math.round(priorityScore * 10) / 10,
+        bestBed: bestBedId,
+        breakdown: { urgencyScore, acuityScore, bestDeptMatch, losScore, transferScore, vipScore }
+      };
+    }
+
+    function isAdjacentDept(bedDept, patientDept) {
+      const adjacent = {
+        '內科': ['心臟內科', '加護'], '外科': ['加護'], '心臟內科': ['內科', '加護'], '加護': ['內科', '外科', '心臟內科']
+      };
+      return adjacent[patientDept]?.includes(bedDept) || false;
+    }
+
+    function smartBedAssignment(waitingPatients, availableBeds) {
+      const prioritized = waitingPatients.map(p => ({ ...p, priority: calculatePriority(p, availableBeds) }))
+        .sort((a, b) => b.priority.score - a.priority.score);
+      const assignments = [];
+      
+      for (const patient of prioritized) {
+        if (patient.priority.bestBed && availableBeds[patient.priority.bestBed]) {
+          assignments.push({ patient: patient.name, bed: patient.priority.bestBed, score: patient.priority.score });
+          delete availableBeds[patient.priority.bestBed];
+        }
+      }
+      return assignments;
+    }
+
+    // UI渲染函式
+    function renderUrgentQueue() {
+      const waiting = mockPatients.filter(p => !p.location).map(p => ({
+        ...p,
+        priority: calculatePriority(p, getAvailableBeds())
+      })).sort((a, b) => b.priority.score - a.priority.score);
+
+      document.getElementById('urgentQueue').innerHTML = `
+        <table>
+          <tr><th>智慧分數</th><th>姓名</th><th>科別</th><th>ACLS</th><th>來源</th><th>動作</th></tr>
+          ${waiting.map(p => `
+            <tr class="${p.urgency === '高' ? 'urgency-high' : 'urgency-med'}">
+              <td><span class="priority-score">${p.priority.score}</span>
+                <div class="score-breakdown">
+                  緊急:${p.priority.breakdown.urgencyScore} ACLS:${p.priority.breakdown.acuityScore} 
+                  科別:${p.priority.breakdown.bestDeptMatch} ${p.vip ? 'VIP+20' : ''}
+                </div>
+              </td>
+              <td>${p.name}${p.vip ? ' 👑' : ''}</td>
+              <td>${p.department}</td>
+              <td>${p.aclsLevel}</td>
+              <td>${p.fromER ? '急診' : '轉診'}</td>
+              <td>${p.priority.bestBed ? 
+                `<button class="assign-btn" onclick="assignBed('${p.id}', '${p.priority.bestBed}')">
+                  分配 ${p.priority.bestBed}
+                </button>` : '無床位'}
+              </td>
+            </tr>
+          `).join('')}
+        </table>
+      `;
+    }
+
+    function getAvailableBeds() {
+      return Object.fromEntries(Object.entries(mockBeds).filter(([_, b]) => b.status === 'available'));
+    }
+
+    function renderAvailableBeds() {
+      const available = Object.entries(getAvailableBeds());
+      document.getElementById('availableBeds').innerHTML = `
+        <table>
+          <tr><th>床號</th><th>科別</th><th>特色</th></tr>
+          ${available.map(([id, bed]) => `
+            <tr><td>${id}</td><td>${bed.department}</td><td class="available">${bed.feature}</td></tr>
+          `).join('')}
+        </table>
+        <p><strong>空床數：${available.length}張</strong></p>
+      `;
+    }
+
+    function renderOccupancy() {
+      const total = Object.keys(mockBeds).length;
+      const available = Object.values(getAvailableBeds()).length;
+      const occupied = total - available;
+      const rate = Math.round((occupied / total) * 100);
+      
+      document.getElementById('occupancyChart').innerHTML = `
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: ${rate}%; background: ${rate > 85 ? '#ff6b6b' : rate > 70 ? '#ffd43b' : '#51cf66'};">
+            ${rate}%
+          </div>
+        </div>
+        <p>使用率：${rate}% (${occupied}/${total}) | 空床：${available}張</p>
+      `;
+    }
+
+    function smartRecommendation() {
+      const waiting = mockPatients.filter(p => !p.location);
+      const availableBeds = getAvailableBeds();
+      const assignments = smartBedAssignment(waiting, { ...availableBeds });
+      
+      document.getElementById('smartRecommendation').innerHTML = `
+        <div style="padding: 20px; background: linear-gradient(135deg, #e3f2fd, #bbdefb); border-radius: 12px;">
+          <h4>🎯 智慧最佳配對 (${assignments.length}/${waiting.length})</h4>
+          ${assignments.map(a => `
+            <div style="display: flex; justify-content: space-between; padding: 12px; background: white; margin: 8px 0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <span>👤 ${a.patient}</span>
+              <span style="color: #28a745; font-weight: bold;">→ 🛏️ ${a.bed} (分數:${a.score})</span>
+            </div>
+          `).join('') || '<p style="color: #28a745; font-weight: bold;">✅ 床位充足，無需調度</p>'}
+          <div style="margin-top: 16px; font-size: 13px; color: #666;">
+            演算法權重：緊急度40% + ACLS25% + 科別20% + 住院天10% + 轉診5% + VIP5%
+          </div>
+        </div>
+      `;
+    }
+
+    // 事件處理
+    window.assignBed = function(patientId, bedId) {
+      const patient = mockPatients.find(p => p.id === patientId);
+      if (patient && mockBeds[bedId]) {
+        patient.location = bedId;
+        mockBeds[bedId].status = 'assigned';
+        mockBeds[bedId].patient = patient.name;
+        document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+        refreshDashboard();
+      }
+    };
+
+    window.autoAssignAll = function() {
+      const waiting = mockPatients.filter(p => !p.location);
+      const availableBeds = getAvailableBeds();
+      const assignments = smartBedAssignment(waiting, { ...availableBeds });
+      
+      assignments.forEach(({ patient, bed }) => {
+        const p = mockPatients.find(mp => mp.name === patient);
+        if (p) {
+          p.location = bed;
+          mockBeds[bed].status = 'assigned';
+          mockBeds[bed].patient = patient;
+        }
+      });
+      
+      document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+      refreshDashboard();
+    };
+
+    window.addDemoPatient = function() {
+      const newId = `聖瑪${String(mockPatients.length + 1).padStart(3, '0')}`;
+      mockPatients.push({
+        id: newId, name: `測試病患${mockPatients.length + 1}`, urgency: '中', 
+        department: ['內科', '外科', '心臟內科'][Math.floor(Math.random() * 3)], 
+        aclsLevel: [1,2,3][Math.floor(Math.random() * 3)], expectedLOS: 3 + Math.floor(Math.random() * 5),
+        fromER: Math.random() > 0.5, transfer: false, vip: Math.random() > 0.8
+      });
+      refreshDashboard();
+    };
+
+    function refreshDashboard() {
+      renderUrgentQueue();
+      renderAvailableBeds();
+      renderOccupancy();
+      smartRecommendation();
+    }
+
+    // 🔥 FHIR整合（THAS Sandbox）
+    function initFHIR() {
+      FHIR.oauth2.ready().then(client => {
+        document.getElementById('fhirStatus').style.display = 'block';
+        console.log('✅ 聖瑪智慧排床 - FHIR連線成功');
+        
+        // 讀真實床位
+        client.request('Location').then(locs => {
+          console.log('FHIR床位資料：', locs);
+          // parseFhirBeds(locs); // 未來實作
+        });
+        
+        // 讀候床病患
+        client.request('Encounter?status=arrived').then(encs => {
+          console.log('FHIR候床病患：', encs);
+          // parseFhirPatients(encs);
+        });
+      }).catch(err => {
+        console.log('ℹ️ Demo模式運行');
+      });
+    }
+
+    // 初始化
+    refreshDashboard();
+    setInterval(refreshDashboard, 5000); // 5秒更新
+    initFHIR();
+
+    // 科別篩選
+    document.getElementById('departmentFilter').addEventListener('change', function() {
+      console.log('篩選科別：', this.value);
+    });
+  </script>
+</body>
+</html>
