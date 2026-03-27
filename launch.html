@@ -4,54 +4,43 @@
     <meta charset="UTF-8">
     <title>啟動中 - 聖瑪智慧排床系統</title>
     <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.js"></script>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin:0; padding:0; }
-        .container { 
-            display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; 
-        }
-        .loader { border: 5px solid #f3f3f3; border-top: 5px solid white; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 24px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .status { font-size: 18px; margin-bottom: 12px; }
-        .info { font-size: 14px; opacity: 0.9; max-width: 500px; text-align: center; }
-        .error { color: #ff6b6b; margin-top: 20px; padding: 12px; background: rgba(255,255,255,0.15); border-radius: 8px; }
-    </style>
 </head>
 <body>
-    <div class="container">
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; color: #666;">
         <div class="loader"></div>
-        <div id="status" class="status">正在連線至 SMART Health IT Sandbox...</div>
-        <div id="info" class="info">請在 https://launch.smarthealthit.org/ 選擇病人後啟動</div>
-        <div id="errorBox" class="error" style="display: none;"></div>
+        <p>正在連線至 FHIR 伺服器並驗證權限...</p>
     </div>
 
+    <style>
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #764ba2;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
     <script>
-        function showError(msg) {
-            const box = document.getElementById('errorBox');
-            box.style.display = 'block';
-            box.innerHTML = msg;
-        }
-
-        // 從 URL 取得 iss（SMART Health IT 會自動帶入）
-        const urlParams = new URLSearchParams(window.location.search);
-        const iss = urlParams.get('iss');
-
-        if (!iss) {
-            showError('缺少 iss 參數！<br>請從 <strong>https://launch.smarthealthit.org/</strong> 啟動此應用程式。<br>選擇 "Provider EHR Launch" 並挑選一位病人。');
-            return;
-        }
-
-        document.getElementById('info').innerHTML = `FHIR Server：<br><strong>${iss}</strong>`;
-
-        // SMART on FHIR 授權（適合 SMART Health IT sandbox）
+        // 執行 SMART on FHIR 啟動程序 [cite: 19, 20]
         FHIR.oauth2.authorize({
-            iss: iss,                                      // 從 launcher 傳來的 iss
-            clientId: "st_mary_bed_manager_v2",            // 可自訂，sandbox 通常接受
-            scope: "launch openid fhirUser patient/*.read encounter.read location.read user/*.read",
-            redirectUri: window.location.origin + "/index.html",   // 改成絕對路徑較穩
-        }).catch(err => {
-            console.error(err);
-            showError('授權失敗：<br>' + (err.message || err));
+            // 臺灣 50 優良 SMART App 徵案 - 第二階段測試用 Client ID [cite: 13]
+            clientId: "cc344727-6f90-496c-94fd-c7829aa9a51d", 
+
+            // 第二階段測試用 Client Secret [cite: 14]
+            clientSecret: "79f04b56b33491716c0880af72cdef7d3f0629111421cedd18353651cd313d9e",
+
+            // 請求的權限範圍：包含啟動上下文、使用者資訊、以及排床所需的病患/就醫/位置資料 [cite: 20, 22]
+            scope: "launch openid fhirUser patient/*.read encounter.read location.read",
+
+            // 授權成功後跳轉回主程式頁面
+            redirectUri: "index.html" 
         });
     </script>
 </body>
