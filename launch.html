@@ -8,7 +8,7 @@
 <body>
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; color: #666;">
         <div class="loader"></div>
-        <p>正在連線至 FHIR 伺服器並驗證權限...</p>
+        <p>正在連線至聖瑪 FHIR 伺服器並驗證權限...</p>
     </div>
 
     <style>
@@ -28,15 +28,17 @@
     </style>
 
     <script>
-        // 執行 SMART on FHIR 啟動程序 [cite: 19, 20]
+        // 執行 SMART on FHIR 啟動程序
         FHIR.oauth2.authorize({
-            // 臺灣 50 優良 SMART App 徵案 - 第二階段測試用 Client ID [cite: 13]
-            clientId: "cc344727-6f90-496c-94fd-c7829aa9a51d", 
+            // 這是你在 FHIR Server 上註冊的 Client ID
+            // 若在測試環境（如 THAS Sandbox）通常可以自定義或使用預設值
+            clientId: "st_mary_bed_manager_v2", 
 
-            // 第二階段測試用 Client Secret [cite: 14]
-            clientSecret: "79f04b56b33491716c0880af72cdef7d3f0629111421cedd18353651cd313d9e",
-
-            // 請求的權限範圍：包含啟動上下文、使用者資訊、以及排床所需的病患/就醫/位置資料 [cite: 20, 22]
+            // 請求的權限範圍：
+            // launch: 啟動上下文
+            // openid / fhirUser: 使用者資訊
+            // patient/*.read: 讀取病患資料
+            // encounter.read: 讀取就醫紀錄（排床用）
             scope: "launch openid fhirUser patient/*.read encounter.read location.read",
 
             // 授權成功後跳轉回主程式頁面
