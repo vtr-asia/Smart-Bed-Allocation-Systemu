@@ -2,65 +2,42 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <title>🛏️ 聖瑪智慧排床系統 v2.0 - 智慧優先權演算法</title>
+  <title>🛏️ 聖瑪智慧排床系統 v2.0</title>
   <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
     .header { text-align: center; color: white; margin-bottom: 30px; }
     .logo { font-size: 2.5em; margin-bottom: 10px; }
     .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
-    .card { border-radius: 16px; padding: 24px; background: white; box-shadow: 0 10px 30px rgba(0,0,0,0.2); backdrop-filter: blur(10px); }
+    .card { border-radius: 16px; padding: 24px; background: white; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
     .urgency-high { background: linear-gradient(45deg, #ff6b6b, #ff8e8e); color: white; }
     .urgency-med { background: linear-gradient(45deg, #ffd43b, #ffe66d); color: #856404; }
     .available { background: linear-gradient(45deg, #51cf66, #74c69d); color: white; }
-    .assigned { background: linear-gradient(45deg, #007bff, #339af0); color: white; }
-    button { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; transition: all 0.3s; }
+    button { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
     .assign-btn { background: #28a745; color: white; }
-    .assign-btn:hover { background: #218838; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(40,167,69,0.4); }
-    .assign-btn:disabled { background: #6c757d; cursor: not-allowed; }
+    .assign-btn:hover { background: #218838; }
     table { width: 100%; border-collapse: collapse; margin-top: 16px; }
     th, td { padding: 12px 8px; text-align: left; border-bottom: 1px solid #eee; }
-    th { background: #f8f9fa; font-weight: 600; }
+    th { background: #f8f9fa; }
     .priority-score { font-size: 24px; font-weight: bold; color: #007bff; }
     .progress-bar { width: 100%; height: 28px; background: #eee; border-radius: 14px; overflow: hidden; margin: 16px 0; }
-    .progress-fill { height: 100%; transition: width 0.5s; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; }
-    .score-breakdown { font-size: 12px; color: #666; margin-top: 6px; background: #f8f9fa; padding: 8px; border-radius: 6px; }
+    .progress-fill { height: 100%; transition: width 0.5s; display: flex; align-items: center; justify-content: center; font-weight: bold; }
     .fhir-status { position: fixed; top: 20px; right: 20px; padding: 12px; background: #28a745; color: white; border-radius: 8px; font-weight: bold; }
-    .controls { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
-    select, input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; }
-
-    /* 病人基本資料樣式 */
-    .patient-info { font-size: 15px; line-height: 1.8; }
     .patient-card { background: #f8f9fa; padding: 14px; margin: 10px 0; border-radius: 10px; border-left: 5px solid #007bff; }
-    .patient-name { font-size: 18px; font-weight: bold; color: #007bff; margin-bottom: 8px; }
-
-    @media (max-width: 768px) { .dashboard { grid-template-columns: 1fr; } }
+    .patient-name { font-size: 18px; font-weight: bold; color: #007bff; }
   </style>
 </head>
 <body>
   <div class="header">
     <div class="logo">🏥 聖瑪智慧排床系統</div>
-    <h2>智慧優先權演算法 v2.0 | SMART Health IT Sandbox 相容</h2>
+    <h2>智慧優先權演算法 v2.0 | SMART Health IT</h2>
     <div id="fhirStatus" class="fhir-status" style="display: none;">連線中...</div>
   </div>
 
   <div class="controls">
-    <select id="departmentFilter">
-      <option value="">全院</option>
-      <option value="內科">內科</option>
-      <option value="外科">外科</option>
-      <option value="加護">加護病房</option>
-      <option value="心臟內科">心臟內科</option>
-    </select>
-    <button class="assign-btn" onclick="autoAssignAll()" style="font-size: 16px;">
-      🚀 全部智慧自動配床
-    </button>
-    <button class="assign-btn" onclick="addDemoPatient()" style="background: #17a2b8;">
-      ➕ 新增測試病患
-    </button>
-    <div style="margin-left: auto; font-weight: bold; color: white;">
-      最後更新：<span id="lastUpdate">即時</span>
-    </div>
+    <button class="assign-btn" onclick="autoAssignAll()">🚀 全部智慧自動配床</button>
+    <button class="assign-btn" onclick="addDemoPatient()" style="background:#17a2b8;">➕ 新增測試病患</button>
+    <div style="margin-left:auto; color:white; font-weight:bold;">最後更新: <span id="lastUpdate">即時</span></div>
   </div>
 
   <div class="dashboard">
@@ -68,3 +45,158 @@
     <div class="card">
       <h3>📋 FHIR 病人基本資料（來自伺服器）</h3>
       <div id="fhirPatientInfo">載入中...</div>
+    </div>
+
+    <div class="card">
+      <h3>🚨 候床病患 (智慧優先排序)</h3>
+      <div id="urgentQueue">載入中...</div>
+    </div>
+
+    <div class="card">
+      <h3>✅ 可用床位</h3>
+      <div id="availableBeds">載入中...</div>
+    </div>
+
+    <div class="card">
+      <h3>📊 床位使用率</h3>
+      <div id="occupancyChart">分析中...</div>
+    </div>
+
+    <div class="card">
+      <h3>🎯 智慧最佳配對建議</h3>
+      <div id="smartRecommendation">等待建議...</div>
+    </div>
+  </div>
+
+  <script>
+    // Mock 資料
+    let mockBeds = { /* ... 保持不變 ... */ 
+      '聖瑪101內': { status: 'available', department: '內科', feature: '心導管室旁' },
+      '聖瑪102內': { status: 'available', department: '內科', feature: '普通病房' },
+      '聖瑪201外': { status: 'available', department: '外科', feature: '手術室旁' },
+      '聖瑪301心': { status: 'available', department: '心臟內科', feature: 'CCU備用' },
+      '聖瑪401加': { status: 'available', department: '加護', feature: '呼吸器設備' }
+    };
+
+    let mockPatients = [
+      { id: '聖瑪001', name: '李大衛', urgency: '高', department: '內科', aclsLevel: 3, expectedLOS: 2, fromER: true },
+      { id: '聖瑪002', name: '陳美玲', urgency: '中', department: '外科', aclsLevel: 2, expectedLOS: 5, fromER: true },
+      { id: '聖瑪003', name: '聖瑪VIP', urgency: '高', department: '心臟內科', aclsLevel: 3, expectedLOS: 3, fromER: true, vip: true }
+    ];
+
+    let fhirClient = null;
+    let realBeds = {};
+    let realPatients = [];
+    let realPatientDetails = [];
+
+    // ==================== 核心演算法（不變） ====================
+    function calculatePriority(patient, availableBeds) {
+      const weights = { urgency: 0.4, acuity: 0.25, deptMatch: 0.2, los: 0.1, vip: 0.05 };
+      const urgencyScore = patient.fromER ? 100 : 30;
+      const acuityScore = patient.aclsLevel === 3 ? 100 : 70;
+      let bestDeptMatch = 0;
+      for (const [bedId, bed] of Object.entries(availableBeds)) {
+        if (bed.status !== 'available') continue;
+        const match = bed.department === patient.department ? 100 : 30;
+        if (match > bestDeptMatch) bestDeptMatch = match;
+      }
+      const score = weights.urgency*urgencyScore + weights.acuity*acuityScore + weights.deptMatch*bestDeptMatch;
+      return { score: Math.round(score*10)/10, bestBed: null };
+    }
+
+    // ==================== FHIR 初始化（加強版） ====================
+    async function initFHIR() {
+      try {
+        fhirClient = await FHIR.oauth2.ready();
+        
+        document.getElementById('fhirStatus').style.display = 'block';
+        document.getElementById('fhirStatus').innerHTML = '✅ 已連線至 SMART Health IT Sandbox';
+
+        const patientId = fhirClient.state?.context?.patient;
+        console.log("Launch Patient ID:", patientId);
+
+        // 載入資料
+        await Promise.allSettled([
+          loadFhirLocations(),
+          loadFhirPatients(patientId)
+        ]);
+
+        refreshDashboard();
+      } catch (err) {
+        console.error("FHIR ready 失敗:", err);
+        document.getElementById('fhirStatus').style.display = 'block';
+        document.getElementById('fhirStatus').style.background = '#ffc107';
+        document.getElementById('fhirStatus').innerHTML = '⚠️ Demo 模式運行';
+        refreshDashboard();
+      }
+    }
+
+    async function loadFhirPatients(specificPatientId = null) {
+      if (!fhirClient) return;
+      try {
+        let patientRes;
+        if (specificPatientId) {
+          patientRes = await fhirClient.request(`Patient/${specificPatientId}`);
+          realPatientDetails = [processPatient(patientRes)];
+        } else {
+          const res = await fhirClient.request('Patient?_count=5');
+          realPatientDetails = res.entry ? res.entry.map(e => processPatient(e.resource)) : [];
+        }
+        console.log(`成功載入 ${realPatientDetails.length} 位病人資料`);
+      } catch (e) {
+        console.warn("載入 Patient 失敗", e);
+        realPatientDetails = [];
+      }
+    }
+
+    function processPatient(pat) {
+      const nameObj = pat.name?.[0] || {};
+      const name = nameObj.text || [nameObj.given?.join(' '), nameObj.family].filter(Boolean).join(' ') || '未知姓名';
+      let age = '未知';
+      if (pat.birthDate) {
+        const birth = new Date(pat.birthDate);
+        age = Math.floor((Date.now() - birth) / (31557600000));
+      }
+      const genderMap = {male:'男', female:'女', other:'其他'};
+      return {
+        id: pat.id,
+        name: name,
+        gender: genderMap[pat.gender] || '未知',
+        age: age,
+        identifier: pat.identifier?.[0]?.value || pat.id
+      };
+    }
+
+    // 其他渲染函式保持簡化（可自行擴充）
+    function renderFhirPatientInfo() {
+      const el = document.getElementById('fhirPatientInfo');
+      if (realPatientDetails.length === 0) {
+        el.innerHTML = `<p style="color:#666;">目前 Sandbox 尚未載入病人資料<br>（Patient ID: ${fhirClient?.state?.context?.patient || '無'}）</p>`;
+        return;
+      }
+      let html = '';
+      realPatientDetails.forEach(p => {
+        html += `<div class="patient-card">
+          <div class="patient-name">${p.name}</div>
+          性別：${p.gender}　年齡：${p.age}歲<br>
+          Patient ID：${p.id}<br>
+          識別碼：${p.identifier}
+        </div>`;
+      });
+      el.innerHTML = html;
+    }
+
+    function refreshDashboard() {
+      renderFhirPatientInfo();
+      // 這裡可繼續加入 renderUrgentQueue()、renderAvailableBeds() 等
+      document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+    }
+
+    // 初始化
+    window.onload = () => {
+      refreshDashboard();
+      initFHIR();
+    };
+  </script>
+</body>
+</html>
