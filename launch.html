@@ -4,44 +4,58 @@
     <meta charset="UTF-8">
     <title>啟動中 - 聖瑪智慧排床系統</title>
     <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin:0; padding:0; }
+        .container {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;
+        }
+        .loader { border: 5px solid rgba(255,255,255,0.3); border-top: 5px solid white; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 24px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .status { font-size: 18px; margin-bottom: 12px; }
+        .info { font-size: 14px; opacity: 0.9; max-width: 500px; text-align: center; line-height: 1.6; }
+        .error { color: #ff6b6b; margin-top: 20px; padding: 16px; background: rgba(255,255,255,0.15); border-radius: 8px; max-width: 480px; text-align: center; line-height: 1.6; }
+    </style>
 </head>
 <body>
-    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; color: #666;">
-        <div class="loader"></div>
-        <p>正在連線至 FHIR 伺服器並驗證權限...</p>
+    <div class="container">
+        <div class="loader" id="loader"></div>
+        <div id="status" class="status">正在連線至 SMART Health IT Sandbox...</div>
+        <div id="info" class="info">請在 https://launch.smarthealthit.org/ 選擇病人後啟動</div>
+        <div id="errorBox" class="error" style="display:none;"></div>
     </div>
 
-    <style>
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #764ba2;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
-
     <script>
-        // 執行 SMART on FHIR 啟動程序 [cite: 19, 20]
-        FHIR.oauth2.authorize({
-            // 臺灣 50 優良 SMART App 徵案 - 第二階段測試用 Client ID [cite: 13]
-            clientId: "cc344727-6f90-496c-94fd-c7829aa9a51d", 
+        function showError(msg) {
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('errorBox').style.display = 'block';
+            document.getElementById('errorBox').innerHTML = msg;
+        }
 
-            // 第二階段測試用 Client Secret [cite: 14]
-            clientSecret: "79f04b56b33491716c0880af72cdef7d3f0629111421cedd18353651cd313d9e",
+        const urlParams = new URLSearchParams(window.location.search);
+        const iss = urlParams.get('iss');
 
-            // 請求的權限範圍：包含啟動上下文、使用者資訊、以及排床所需的病患/就醫/位置資料 [cite: 20, 22]
-            scope: "launch openid fhirUser patient/*.read encounter.read location.read",
+        if (!iss) {
+            showError(
+                '❌ 缺少 iss 參數！<br><br>' +
+                '請前往 <a href="https://launch.smarthealthit.org/" target="_blank" style="color:#ffd43b;">https://launch.smarthealthit.org/</a><br>' +
+                '選擇「Provider EHR Launch」→ 挑選一位病人 → 填入本頁網址啟動。'
+            );
+        } else {
+            document.getElementById('info').innerHTML = `FHIR Server：<br><strong>${iss}</strong>`;
 
-            // 授權成功後跳轉回主程式頁面
-            redirectUri: "index.html" 
-        });
+            FHIR.oauth2.authorize({
+                iss: iss,
+                clientId: "st_mary_bed_manager_v2",
+                // ✅ 修復：移除 sandbox 不支援的 encounter.read / location.read
+                scope: "launch openid fhirUser patient/*.read user/*.read",
+                // ✅ 修復：相對路徑，避免 file:// 或部署路徑不一致造成 redirect_uri_mismatch
+                redirectUri: "index.html"
+            }).catch(err => {
+                console.error(err);
+                showError('❌ 授權失敗：<br>' + (err.message || JSON.stringify(err)));
+            });
+        }
     </script>
 </body>
 </html>

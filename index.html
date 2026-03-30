@@ -6,193 +6,334 @@
   <script src="https://cdn.jsdelivr.net/npm/fhirclient/build/fhir-client.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
-    .header { text-align: center; color: white; margin-bottom: 30px; }
-    .logo { font-size: 2.5em; margin-bottom: 10px; }
+    .header { text-align: center; color: white; margin-bottom: 24px; }
+    .logo { font-size: 2.5em; margin-bottom: 8px; }
+    .controls { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
     .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
     .card { border-radius: 16px; padding: 24px; background: white; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-    .urgency-high { background: linear-gradient(45deg, #ff6b6b, #ff8e8e); color: white; }
-    .urgency-med { background: linear-gradient(45deg, #ffd43b, #ffe66d); color: #856404; }
-    .available { background: linear-gradient(45deg, #51cf66, #74c69d); color: white; }
-    button { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+    button { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
     .assign-btn { background: #28a745; color: white; }
-    .assign-btn:hover { background: #218838; }
-    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-    th, td { padding: 12px 8px; text-align: left; border-bottom: 1px solid #eee; }
-    th { background: #f8f9fa; }
-    .priority-score { font-size: 24px; font-weight: bold; color: #007bff; }
-    .progress-bar { width: 100%; height: 28px; background: #eee; border-radius: 14px; overflow: hidden; margin: 16px 0; }
-    .progress-fill { height: 100%; transition: width 0.5s; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-    .fhir-status { position: fixed; top: 20px; right: 20px; padding: 12px; background: #28a745; color: white; border-radius: 8px; font-weight: bold; }
-    .patient-card { background: #f8f9fa; padding: 14px; margin: 10px 0; border-radius: 10px; border-left: 5px solid #007bff; }
-    .patient-name { font-size: 18px; font-weight: bold; color: #007bff; }
+    .assign-btn:hover { background: #218838; transform: translateY(-1px); }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+    th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f8f9fa; font-weight: 600; color: #495057; }
+    tr:hover td { background: #f8f9fa; }
+    .priority-score { font-size: 22px; font-weight: bold; color: #007bff; }
+    .progress-bar { width: 100%; height: 26px; background: #eee; border-radius: 13px; overflow: hidden; margin: 8px 0; }
+    .progress-fill { height: 100%; transition: width 0.6s ease; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; color: white; }
+    .fhir-badge { display: inline-block; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; margin-bottom: 8px; }
+    .badge-ok  { background: rgba(40,167,69,0.15);  color: #155724; border: 1px solid #c3e6cb; }
+    .badge-demo{ background: rgba(255,193,7,0.15);  color: #856404; border: 1px solid #ffeeba; }
+    .badge-err { background: rgba(220,53,69,0.15);  color: #721c24; border: 1px solid #f5c6cb; }
+    .patient-card { background: #f8f9fa; padding: 14px; margin: 8px 0; border-radius: 10px; border-left: 5px solid #007bff; }
+    .patient-name { font-size: 17px; font-weight: bold; color: #007bff; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; margin: 2px; }
+    .tag-high   { background: #dc3545; color: white; }
+    .tag-med    { background: #ffc107; color: #333; }
+    .tag-low    { background: #28a745; color: white; }
+    .tag-vip    { background: #6f42c1; color: white; }
+    .tag-er     { background: #fd7e14; color: white; }
+    .bed-row-avail { color: #155724; }
+    .bed-row-occ   { color: #721c24; }
+    .recommendation-box { background: linear-gradient(135deg, #e3f2fd, #bbdefb); border-radius: 12px; padding: 16px; margin: 8px 0; border-left: 5px solid #1976d2; }
+    .rec-title { font-weight: bold; font-size: 15px; color: #1565c0; margin-bottom: 6px; }
+    .rec-detail { font-size: 13px; color: #37474f; line-height: 1.6; }
+    .score-chip { display: inline-block; background: #1976d2; color: white; border-radius: 12px; padding: 2px 10px; font-size: 13px; font-weight: bold; margin-left: 8px; }
+    .empty-state { color: #aaa; text-align: center; padding: 24px; font-size: 14px; }
+    #lastUpdate { color: white; font-size: 13px; margin-left: auto; }
   </style>
 </head>
 <body>
   <div class="header">
     <div class="logo">🏥 聖瑪智慧排床系統</div>
-    <h2>智慧優先權演算法 v2.0 | SMART Health IT</h2>
-    <div id="fhirStatus" class="fhir-status" style="display: none;">連線中...</div>
+    <h2 style="font-weight:400; font-size:1.1em; opacity:0.9;">智慧優先權演算法 v2.0 | SMART Health IT</h2>
+    <div id="fhirBadge" class="fhir-badge badge-demo">⏳ 連線中...</div>
   </div>
 
   <div class="controls">
     <button class="assign-btn" onclick="autoAssignAll()">🚀 全部智慧自動配床</button>
     <button class="assign-btn" onclick="addDemoPatient()" style="background:#17a2b8;">➕ 新增測試病患</button>
-    <div style="margin-left:auto; color:white; font-weight:bold;">最後更新: <span id="lastUpdate">即時</span></div>
+    <span id="lastUpdate">最後更新：即時</span>
   </div>
 
   <div class="dashboard">
-    <!-- 最上方：FHIR 病人基本資料 -->
     <div class="card">
       <h3>📋 FHIR 病人基本資料（來自伺服器）</h3>
-      <div id="fhirPatientInfo">載入中...</div>
+      <div id="fhirPatientInfo"><div class="empty-state">連線中...</div></div>
     </div>
 
     <div class="card">
-      <h3>🚨 候床病患 (智慧優先排序)</h3>
-      <div id="urgentQueue">載入中...</div>
+      <h3>🚨 候床病患（智慧優先排序）</h3>
+      <div id="urgentQueue"><div class="empty-state">載入中...</div></div>
     </div>
 
     <div class="card">
       <h3>✅ 可用床位</h3>
-      <div id="availableBeds">載入中...</div>
+      <div id="availableBeds"><div class="empty-state">載入中...</div></div>
     </div>
 
     <div class="card">
       <h3>📊 床位使用率</h3>
-      <div id="occupancyChart">分析中...</div>
+      <div id="occupancyChart"><div class="empty-state">分析中...</div></div>
     </div>
 
     <div class="card">
       <h3>🎯 智慧最佳配對建議</h3>
-      <div id="smartRecommendation">等待建議...</div>
+      <div id="smartRecommendation"><div class="empty-state">等待建議...</div></div>
     </div>
   </div>
 
   <script>
-    // Mock 資料
-    let mockBeds = { /* ... 保持不變 ... */ 
-      '聖瑪101內': { status: 'available', department: '內科', feature: '心導管室旁' },
-      '聖瑪102內': { status: 'available', department: '內科', feature: '普通病房' },
-      '聖瑪201外': { status: 'available', department: '外科', feature: '手術室旁' },
-      '聖瑪301心': { status: 'available', department: '心臟內科', feature: 'CCU備用' },
-      '聖瑪401加': { status: 'available', department: '加護', feature: '呼吸器設備' }
+    // ===================== 資料狀態 =====================
+    let mockBeds = {
+      '聖瑪101內': { status: 'available', department: '內科',    feature: '心導管室旁' },
+      '聖瑪102內': { status: 'available', department: '內科',    feature: '普通病房'   },
+      '聖瑪201外': { status: 'available', department: '外科',    feature: '手術室旁'   },
+      '聖瑪301心': { status: 'available', department: '心臟內科', feature: 'CCU備用'   },
+      '聖瑪401加': { status: 'available', department: '加護',    feature: '呼吸器設備' }
     };
 
     let mockPatients = [
-      { id: '聖瑪001', name: '李大衛', urgency: '高', department: '內科', aclsLevel: 3, expectedLOS: 2, fromER: true },
-      { id: '聖瑪002', name: '陳美玲', urgency: '中', department: '外科', aclsLevel: 2, expectedLOS: 5, fromER: true },
-      { id: '聖瑪003', name: '聖瑪VIP', urgency: '高', department: '心臟內科', aclsLevel: 3, expectedLOS: 3, fromER: true, vip: true }
+      { id: '聖瑪001', name: '李大衛', urgency: '高', department: '內科',    aclsLevel: 3, expectedLOS: 2, fromER: true },
+      { id: '聖瑪002', name: '陳美玲', urgency: '中', department: '外科',    aclsLevel: 2, expectedLOS: 5, fromER: true },
+      { id: '聖瑪003', name: 'VIP張董', urgency: '高', department: '心臟內科', aclsLevel: 3, expectedLOS: 3, fromER: true, vip: true }
     ];
 
-    let fhirClient = null;
-    let realBeds = {};
-    let realPatients = [];
-    let realPatientDetails = [];
+    let fhirClient       = null;
+    let realPatientDetails = [];   // 從 FHIR server 取得的病人
+    let assignments      = {};     // bedId → patient
 
-    // ==================== 核心演算法（不變） ====================
-    function calculatePriority(patient, availableBeds) {
+    // ===================== 演算法 =====================
+    function calculatePriority(patient) {
       const weights = { urgency: 0.4, acuity: 0.25, deptMatch: 0.2, los: 0.1, vip: 0.05 };
-      const urgencyScore = patient.fromER ? 100 : 30;
-      const acuityScore = patient.aclsLevel === 3 ? 100 : 70;
-      let bestDeptMatch = 0;
-      for (const [bedId, bed] of Object.entries(availableBeds)) {
+      const urgencyScore = patient.urgency === '高' ? 100 : patient.urgency === '中' ? 60 : 30;
+      const acuityScore  = patient.aclsLevel === 3 ? 100 : patient.aclsLevel === 2 ? 70 : 40;
+      const erScore      = patient.fromER ? 100 : 30;
+      let bestDeptMatch  = 0;
+      for (const bed of Object.values(mockBeds)) {
         if (bed.status !== 'available') continue;
-        const match = bed.department === patient.department ? 100 : 30;
-        if (match > bestDeptMatch) bestDeptMatch = match;
+        if (bed.department === patient.department) { bestDeptMatch = 100; break; }
+        else if (bestDeptMatch < 30) bestDeptMatch = 30;
       }
-      const score = weights.urgency*urgencyScore + weights.acuity*acuityScore + weights.deptMatch*bestDeptMatch;
-      return { score: Math.round(score*10)/10, bestBed: null };
+      const losScore = Math.max(0, 100 - patient.expectedLOS * 10);
+      const vipBonus = patient.vip ? 100 : 0;
+      const score =
+        weights.urgency   * urgencyScore +
+        weights.acuity    * acuityScore  +
+        weights.deptMatch * bestDeptMatch +
+        weights.los       * losScore     +
+        weights.vip       * vipBonus;
+      return Math.round(score * 10) / 10;
     }
 
-    // ==================== FHIR 初始化（加強版） ====================
+    function bestBedForPatient(patient) {
+      let best = null, bestScore = -1;
+      for (const [bedId, bed] of Object.entries(mockBeds)) {
+        if (bed.status !== 'available') continue;
+        const deptBonus = bed.department === patient.department ? 30 : 0;
+        const s = deptBonus + (patient.urgency === '高' ? 10 : 0);
+        if (s > bestScore) { bestScore = s; best = bedId; }
+      }
+      return best;
+    }
+
+    // ===================== 自動配床 =====================
+    function autoAssignAll() {
+      const sorted = [...mockPatients].sort((a, b) => calculatePriority(b) - calculatePriority(a));
+      let assigned = 0;
+      for (const p of sorted) {
+        const bed = bestBedForPatient(p);
+        if (bed) {
+          mockBeds[bed].status = 'occupied';
+          assignments[bed] = p.name;
+          assigned++;
+        }
+      }
+      alert(`✅ 已自動配床 ${assigned} 位病患`);
+      refreshDashboard();
+    }
+
+    // ===================== 新增測試病患 =====================
+    let demoCount = 0;
+    const deptList = ['內科','外科','心臟內科','加護','骨科'];
+    function addDemoPatient() {
+      demoCount++;
+      const dept = deptList[demoCount % deptList.length];
+      mockPatients.push({
+        id: `測試${demoCount}`,
+        name: `測試病患 ${demoCount}`,
+        urgency: demoCount % 2 === 0 ? '高' : '中',
+        department: dept,
+        aclsLevel: demoCount % 2 === 0 ? 3 : 2,
+        expectedLOS: Math.floor(Math.random() * 7) + 1,
+        fromER: true
+      });
+      refreshDashboard();
+    }
+
+    // ===================== FHIR 初始化 =====================
     async function initFHIR() {
       try {
         fhirClient = await FHIR.oauth2.ready();
-        
-        document.getElementById('fhirStatus').style.display = 'block';
-        document.getElementById('fhirStatus').innerHTML = '✅ 已連線至 SMART Health IT Sandbox';
+        setBadge('ok', '✅ 已連線至 SMART Health IT Sandbox');
 
-        const patientId = fhirClient.state?.context?.patient;
-        console.log("Launch Patient ID:", patientId);
+        // ✅ 修復：正確取得 patient context
+        const patientId = fhirClient.getPatientId();
+        console.log('Launch Patient ID:', patientId);
 
-        // 載入資料
-        await Promise.allSettled([
-          loadFhirLocations(),
-          loadFhirPatients(patientId)
-        ]);
-
+        await loadFhirPatients(patientId);
         refreshDashboard();
       } catch (err) {
-        console.error("FHIR ready 失敗:", err);
-        document.getElementById('fhirStatus').style.display = 'block';
-        document.getElementById('fhirStatus').style.background = '#ffc107';
-        document.getElementById('fhirStatus').innerHTML = '⚠️ Demo 模式運行';
+        console.error('FHIR ready 失敗:', err);
+        setBadge('demo', '⚠️ Demo 模式（未連線 FHIR）');
         refreshDashboard();
       }
     }
 
+    // ✅ 修復：原本呼叫 loadFhirLocations() 但函式未定義，已移除並改為只載入 Patient
     async function loadFhirPatients(specificPatientId = null) {
       if (!fhirClient) return;
       try {
-        let patientRes;
         if (specificPatientId) {
-          patientRes = await fhirClient.request(`Patient/${specificPatientId}`);
-          realPatientDetails = [processPatient(patientRes)];
+          const pat = await fhirClient.request(`Patient/${specificPatientId}`);
+          realPatientDetails = [processPatient(pat)];
         } else {
-          const res = await fhirClient.request('Patient?_count=5');
-          realPatientDetails = res.entry ? res.entry.map(e => processPatient(e.resource)) : [];
+          const bundle = await fhirClient.request('Patient?_count=5&_sort=-_lastUpdated');
+          realPatientDetails = (bundle.entry || []).map(e => processPatient(e.resource));
         }
-        console.log(`成功載入 ${realPatientDetails.length} 位病人資料`);
+        console.log(`成功載入 ${realPatientDetails.length} 位 FHIR 病人`);
       } catch (e) {
-        console.warn("載入 Patient 失敗", e);
+        console.warn('載入 Patient 失敗:', e);
         realPatientDetails = [];
       }
     }
 
     function processPatient(pat) {
-      const nameObj = pat.name?.[0] || {};
-      const name = nameObj.text || [nameObj.given?.join(' '), nameObj.family].filter(Boolean).join(' ') || '未知姓名';
+      const n    = pat.name?.[0] || {};
+      const name = n.text
+        || [[...(n.given || [])].join(' '), n.family].filter(Boolean).join(' ')
+        || '未知姓名';
       let age = '未知';
       if (pat.birthDate) {
-        const birth = new Date(pat.birthDate);
-        age = Math.floor((Date.now() - birth) / (31557600000));
+        age = Math.floor((Date.now() - new Date(pat.birthDate)) / 31557600000);
       }
-      const genderMap = {male:'男', female:'女', other:'其他'};
       return {
-        id: pat.id,
-        name: name,
-        gender: genderMap[pat.gender] || '未知',
-        age: age,
+        id:         pat.id,
+        name,
+        gender:     { male:'男', female:'女' }[pat.gender] || '其他',
+        age,
+        birthDate:  pat.birthDate || '—',
         identifier: pat.identifier?.[0]?.value || pat.id
       };
     }
 
-    // 其他渲染函式保持簡化（可自行擴充）
+    // ===================== 渲染函式 =====================
+    function setBadge(type, text) {
+      const el = document.getElementById('fhirBadge');
+      el.className = `fhir-badge badge-${type}`;
+      el.textContent = text;
+    }
+
     function renderFhirPatientInfo() {
       const el = document.getElementById('fhirPatientInfo');
       if (realPatientDetails.length === 0) {
-        el.innerHTML = `<p style="color:#666;">目前 Sandbox 尚未載入病人資料<br>（Patient ID: ${fhirClient?.state?.context?.patient || '無'}）</p>`;
+        el.innerHTML = `<div class="empty-state">
+          ${fhirClient ? '⚠️ 伺服器未回傳病人資料' : '🔌 Demo 模式：未連線 FHIR 伺服器'}<br>
+          <small>Patient ID: ${fhirClient?.getPatientId() || '無'}</small>
+        </div>`;
         return;
       }
-      let html = '';
-      realPatientDetails.forEach(p => {
-        html += `<div class="patient-card">
-          <div class="patient-name">${p.name}</div>
-          性別：${p.gender}　年齡：${p.age}歲<br>
-          Patient ID：${p.id}<br>
-          識別碼：${p.identifier}
-        </div>`;
-      });
-      el.innerHTML = html;
+      el.innerHTML = realPatientDetails.map(p => `
+        <div class="patient-card">
+          <div class="patient-name">👤 ${p.name}</div>
+          性別：${p.gender}　年齡：${p.age} 歲　生日：${p.birthDate}<br>
+          <small style="color:#888;">Patient ID：${p.id}　識別碼：${p.identifier}</small>
+        </div>`).join('');
     }
 
+    function renderUrgentQueue() {
+      const el = document.getElementById('urgentQueue');
+      if (mockPatients.length === 0) {
+        el.innerHTML = '<div class="empty-state">目前無候床病患</div>'; return;
+      }
+      const sorted = [...mockPatients].sort((a,b) => calculatePriority(b) - calculatePriority(a));
+      el.innerHTML = `<table>
+        <tr><th>病患</th><th>科別</th><th>緊急度</th><th>優先分</th></tr>
+        ${sorted.map(p => `<tr>
+          <td><strong>${p.name}</strong>${p.vip ? ' <span class="tag tag-vip">VIP</span>' : ''}${p.fromER ? ' <span class="tag tag-er">急診</span>' : ''}</td>
+          <td>${p.department}</td>
+          <td><span class="tag ${p.urgency==='高'?'tag-high':p.urgency==='中'?'tag-med':'tag-low'}">${p.urgency}</span></td>
+          <td><span class="priority-score">${calculatePriority(p)}</span></td>
+        </tr>`).join('')}
+      </table>`;
+    }
+
+    function renderAvailableBeds() {
+      const el = document.getElementById('availableBeds');
+      el.innerHTML = `<table>
+        <tr><th>床號</th><th>科別</th><th>特點</th><th>狀態</th></tr>
+        ${Object.entries(mockBeds).map(([id, bed]) => `<tr>
+          <td><strong>${id}</strong></td>
+          <td>${bed.department}</td>
+          <td><small>${bed.feature}</small></td>
+          <td class="${bed.status==='available'?'bed-row-avail':'bed-row-occ'}">
+            ${bed.status==='available' ? '✅ 空床' : `🛏️ ${assignments[id]||'使用中'}`}
+          </td>
+        </tr>`).join('')}
+      </table>`;
+    }
+
+    function renderOccupancy() {
+      const el = document.getElementById('occupancyChart');
+      const total     = Object.keys(mockBeds).length;
+      const occupied  = Object.values(mockBeds).filter(b => b.status !== 'available').length;
+      const pct       = Math.round(occupied / total * 100);
+      const color     = pct >= 80 ? '#dc3545' : pct >= 60 ? '#ffc107' : '#28a745';
+      el.innerHTML = `
+        <div style="font-size:36px;font-weight:bold;color:${color};text-align:center;">${pct}%</div>
+        <div style="text-align:center;color:#666;margin-bottom:8px;">使用中 ${occupied} / 共 ${total} 床</div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${pct}%;background:${color};">${pct}%</div>
+        </div>
+        <small style="color:#888;">空床：${total - occupied} 床　| 使用中：${occupied} 床</small>`;
+    }
+
+    function renderRecommendation() {
+      const el = document.getElementById('smartRecommendation');
+      const availableCount = Object.values(mockBeds).filter(b => b.status === 'available').length;
+      if (mockPatients.length === 0 || availableCount === 0) {
+        el.innerHTML = '<div class="empty-state">無可配對資源</div>'; return;
+      }
+      const sorted = [...mockPatients].sort((a,b) => calculatePriority(b) - calculatePriority(a));
+      const recs = sorted.slice(0, 3).map(p => {
+        const bed   = bestBedForPatient(p);
+        const score = calculatePriority(p);
+        return `<div class="recommendation-box">
+          <div class="rec-title">
+            ${p.name} <span class="score-chip">${score} 分</span>
+          </div>
+          <div class="rec-detail">
+            建議床位：<strong>${bed || '暫無合適空床'}</strong><br>
+            科別：${p.department}　緊急度：${p.urgency}　ACLS：Level ${p.aclsLevel}<br>
+            預計住院：${p.expectedLOS} 天
+          </div>
+        </div>`;
+      }).join('');
+      el.innerHTML = recs;
+    }
+
+    // ===================== 主刷新 =====================
     function refreshDashboard() {
       renderFhirPatientInfo();
-      // 這裡可繼續加入 renderUrgentQueue()、renderAvailableBeds() 等
-      document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+      renderUrgentQueue();
+      renderAvailableBeds();
+      renderOccupancy();
+      renderRecommendation();
+      document.getElementById('lastUpdate').textContent =
+        '最後更新：' + new Date().toLocaleTimeString('zh-TW');
     }
 
-    // 初始化
+    // ===================== 啟動 =====================
     window.onload = () => {
       refreshDashboard();
       initFHIR();
