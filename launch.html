@@ -1,3 +1,4 @@
+<DOCUMENT filename="launch.html">
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -46,10 +47,9 @@
 
             FHIR.oauth2.authorize({
                 iss: iss,
-                clientId: "st_mary_bed_manager_v2",
-                // ✅ 修復：移除 sandbox 不支援的 encounter.read / location.read
+                clientId: "cc344727-6f90-496c-94fd-c7829aa9a51d",           // ← 已更新為正式 client_id
+                clientSecret: "79f04b56b33491716c0880af72cdef7d3f0629111421cedd18353651cd313d9e",  // ← 已加入 client_secret
                 scope: "launch openid fhirUser patient/*.read user/*.read",
-                // ✅ 修復：相對路徑，避免 file:// 或部署路徑不一致造成 redirect_uri_mismatch
                 redirectUri: "index.html"
             }).catch(err => {
                 console.error(err);
@@ -59,3 +59,4 @@
     </script>
 </body>
 </html>
+</DOCUMENT>
